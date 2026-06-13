@@ -1,3 +1,4 @@
+from .admin import *  # noqa
 from .cache import *  # noqa
 from .graphql import *  # noqa
 from .logs import *  # noqa
