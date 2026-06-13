@@ -1,0 +1,115 @@
+services:
+  web:
+    build:
+      context: .
+      dockerfile: deployments/compose/backend/Dockerfile
+    command: /start
+    env_file:
+      - .env
+    restart: always
+    volumes:
+      - ./src:/app
+      - ./assets:/assets
+    ports:
+      - ${PORT:-8000}:8000
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - backend_network
+
+  postgres:
+    image: postgres:16-alpine
+    env_file:
+      - .env
+    restart: always
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - backend_network
+
+  redis:
+    image: redis:7-alpine
+    restart: always
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - backend_network
+
+  celery_worker:
+    build:
+      context: .
+      dockerfile: deployments/compose/backend/Dockerfile
+    command: /start-celeryworker
+    env_file:
+      - .env
+    restart: always
+    volumes:
+      - ./src:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - backend_network
+
+  celery_beat:
+    build:
+      context: .
+      dockerfile: deployments/compose/backend/Dockerfile
+    command: /start-celerybeat
+    env_file:
+      - .env
+    restart: always
+    volumes:
+      - ./src:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - backend_network
+
+  celery_flower:
+    build:
+      context: .
+      dockerfile: deployments/compose/backend/Dockerfile
+    command: /start-flower
+    env_file:
+      - .env
+    restart: always
+    volumes:
+      - ./src:/app
+    ports:
+      - ${CELERY_FLOWER_PORT:-5555}:5555
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - backend_network
+
+volumes:
+  pg_data:
+    driver: local
+
+networks:
+  backend_network:
+    driver: bridge

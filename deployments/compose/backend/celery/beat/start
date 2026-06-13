@@ -1,0 +1,6 @@
+#!/bin/bash
+
+set -o errexit
+set -o nounset
+
+celery -A core beat --loglevel=info --scheduler django_celery_beat.schedulers:DatabaseScheduler
